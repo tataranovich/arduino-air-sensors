@@ -9,7 +9,7 @@ EthernetServer server(80);
 String request;
 DHT dht(2, DHT22);
 SoftwareSerial co2Serial(8, 9);
-float humidity, temp_c, co2;
+float humidity, temp_c, co2_ppm;
 
 unsigned long currentMillis, previousMillis;
 // update sensors every 5s
@@ -61,11 +61,15 @@ void action_co2(EthernetClient client) {
   client.println("Connection: close");
   client.println();
   client.print("CO2: ");
-  client.print(co2);
+  client.print(co2_ppm);
   client.println(" ppm");
 }
 
 void update_sensors() {
+  float _humidity;
+  float _temp_c;
+  int _co2_ppm;
+
   currentMillis = millis();
   if (previousMillis > currentMillis) {
     previousMillis = 0;
@@ -77,10 +81,10 @@ void update_sensors() {
     Serial.println(" msec");
     previousMillis = currentMillis;
 
-    humidity = dht.readHumidity();
-    temp_c = dht.readTemperature();
+    _humidity = dht.readHumidity();
+    _temp_c = dht.readTemperature();
 
-    if (isnan(humidity) || isnan(temp_c)) {
+    if (isnan(_humidity) || isnan(_temp_c)) {
       Serial.println("Failed to read data from DHT22");
       return;
     }
@@ -88,20 +92,30 @@ void update_sensors() {
     // DHT22 measurements range
     // Humidity: 0..100%
     // Temperature: -40C..50C
-    if (temp_c < -40.0 || temp_c >= 50.0) {
+    if (_temp_c < -40.0 || _temp_c >= 50.0) {
       Serial.println("Temperature value readed from DHT22 is out of range -40C .. 50C");
       return;
     }
-    if (humidity < 0.0 || humidity > 100) {
+    temp_c = _temp_c;
+
+    if (_humidity < 0.0 || _humidity > 100) {
       Serial.println("Humidity value readed from DHT22 is out of range 0%..100%");
       return;
     }
+    humidity = _humidity;
 
-    co2 = readCO2();
-    if (isnan(co2)) {
+    _co2_ppm = readCO2();
+    if (isnan(_co2_ppm)) {
       Serial.println("Failed to read data from MH-Z19");
       return;
     }
+    if (_co2_ppm < 100 || _co2_ppm > 6000) {
+      Serial.println("CO2 value readed from MH-Z19 is out of range 100..5000 ppm");
+      return;
+    }
+    co2_ppm = _co2_ppm;
+  } else {
+    Serial.println("Using cached sensor values");
   }
 }
 
@@ -147,6 +161,8 @@ void setup() {
   Serial.print(Ethernet.localIP());
   Serial.println("/");
   dht.begin();
+  // initial delay for device stabilization
+  delay(updateInterval);
 }
 
 void loop() {
@@ -157,7 +173,7 @@ void loop() {
       if (client.available()) {
         char c = client.read();
         // Limit request size to 1k
-        if (request.length() < 1024) {
+        if (request.length() < 128) {
           request += c;
         }
         if (c == '\n' && currentLineIsBlank) {
