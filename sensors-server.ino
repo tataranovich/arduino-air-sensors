@@ -1,3 +1,4 @@
+#include <SoftwareSerial.h>
 #include <DHT.h>
 #include <SPI.h>
 #include <Ethernet.h>
@@ -7,7 +8,9 @@ IPAddress ip(192,168,1,177);
 EthernetServer server(80);
 String request;
 DHT dht(2, DHT22);
-float humidity, temp_c;
+SoftwareSerial co2Serial(8, 9);
+float humidity, temp_c, co2;
+
 unsigned long currentMillis, previousMillis;
 // update sensors every 5s
 const long updateInterval = 5000;
@@ -52,11 +55,14 @@ void action_humidity(EthernetClient client) {
 }
 
 void action_co2(EthernetClient client) {
+  update_sensors();
   client.println("HTTP/1.1 200 OK");
   client.println("Content-Type: text/plain");
   client.println("Connection: close");
   client.println();
-  client.println("CO2: 870 ppm");
+  client.print("CO2: ");
+  client.print(co2);
+  client.println(" ppm");
 }
 
 void update_sensors() {
@@ -90,11 +96,51 @@ void update_sensors() {
       Serial.println("Humidity value readed from DHT22 is out of range 0%..100%");
       return;
     }
+
+    co2 = readCO2();
+    if (isnan(co2)) {
+      Serial.println("Failed to read data from MH-Z19");
+      return;
+    }
   }
+}
+
+int readCO2()
+{
+  byte cmd[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
+  byte response[9];
+
+  co2Serial.write(cmd, 9); //request PPM CO2
+  co2Serial.readBytes(response, 9);
+
+  for (int i = 0; i < 9; i++) {
+    Serial.print("0x");
+    Serial.print(response[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println("");
+
+  if (response[0] != 0xFF)
+  {
+    Serial.println("Incorrect start byte from MH-Z19 sensor");
+    return -1;
+  }
+
+  if (response[1] != 0x86)
+  {
+    Serial.println("Incorrect response from MH-Z19 sensor");
+    return -1;
+  }
+
+  int responseHigh = (int) response[2];
+  int responseLow = (int) response[3];
+  int ppm = (256 * responseHigh) + responseLow;
+  return ppm;
 }
 
 void setup() {
   Serial.begin(9600);
+  co2Serial.begin(9600);
   Ethernet.begin(mac, ip);
   server.begin();
   Serial.print("Server started at http://");
