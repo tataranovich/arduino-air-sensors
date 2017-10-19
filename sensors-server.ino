@@ -10,6 +10,7 @@ String request;
 DHT dht(2, DHT22);
 SoftwareSerial co2Serial(8, 9);
 float humidity, temp_c, co2_ppm;
+bool health_status;
 
 unsigned long currentMillis, previousMillis;
 // update sensors every 5s
@@ -39,7 +40,11 @@ void action_temp(EthernetClient client) {
   client.println("Connection: close");
   client.println();
   client.print("Temperature: ");
-  client.print(temp_c);
+  if (health_status) {
+    client.print(temp_c);
+  } else {
+    client.print("nan");
+  }
   client.println(" C");
 }
 
@@ -50,7 +55,11 @@ void action_humidity(EthernetClient client) {
   client.println("Connection: close");
   client.println();
   client.print("Humidity: ");
-  client.print(humidity);
+  if (health_status) {
+    client.print(humidity);
+  } else {
+    client.print("nan");
+  }
   client.println("%");
 }
 
@@ -61,8 +70,28 @@ void action_co2(EthernetClient client) {
   client.println("Connection: close");
   client.println();
   client.print("CO2: ");
-  client.print(co2_ppm);
+  if (health_status) {
+    client.print(co2_ppm);
+  } else {
+    client.print("nan");
+  }
   client.println(" ppm");
+}
+
+void action_status_health(EthernetClient client) {
+  if (health_status) {
+    client.println("HTTP/1.1 200 OK");
+  } else {
+    client.println("HTTP/1.1 500 Internal Server Error");
+  }
+  client.println("Content-Type: text/plain");
+  client.println("Connection: close");
+  client.println();
+  if (health_status) {
+    client.println("OK");
+  } else {
+    client.println("FAIL");
+  }
 }
 
 void update_sensors() {
@@ -80,6 +109,7 @@ void update_sensors() {
     Serial.print(currentMillis);
     Serial.println(" msec");
     previousMillis = currentMillis;
+    health_status = false;
 
     _humidity = dht.readHumidity();
     _temp_c = dht.readTemperature();
@@ -114,6 +144,7 @@ void update_sensors() {
       return;
     }
     co2_ppm = _co2_ppm;
+    health_status = true;
   } else {
     Serial.println("Using cached sensor values");
   }
@@ -188,6 +219,10 @@ void loop() {
           }
           if (request.indexOf("/co2") > 0) {
             action_co2(client);
+            break;
+          }
+          if (request.indexOf("/status/health") > 0) {
+            action_status_health(client);
             break;
           }
           // default response
