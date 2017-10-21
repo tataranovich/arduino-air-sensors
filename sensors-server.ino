@@ -1,3 +1,4 @@
+#include <MemoryFree.h>
 #include <SoftwareSerial.h>
 #include <DHT.h>
 #include <SPI.h>
@@ -194,6 +195,8 @@ void setup() {
   dht.begin();
   // initial delay for device stabilization
   delay(updateInterval);
+  Serial.print("setup() free memory: ");
+  Serial.println(freeMemory());
 }
 
 void loop() {
@@ -239,5 +242,7 @@ void loop() {
     delay(1);
     client.stop();
     request = "";
+    Serial.print("loop() free memory: ");
+    Serial.println(freeMemory());
   }
 }
