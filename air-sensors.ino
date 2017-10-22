@@ -1,3 +1,4 @@
+#include <MemoryFree.h>
 #include <SoftwareSerial.h>
 #include <DHT.h>
 #include <SPI.h>
@@ -17,80 +18,80 @@ unsigned long currentMillis, previousMillis;
 const long updateInterval = 5000;
 
 void action_index(EthernetClient client) {
-  client.println("HTTP/1.1 200 OK");
-  client.println("Content-Type: text/html");
-  client.println("Connection: close");
+  client.println(F("HTTP/1.1 200 OK"));
+  client.println(F("Content-Type: text/html"));
+  client.println(F("Connection: close"));
   client.println();
-  client.println("<!DOCTYPE HTML>");
-  client.println("<html>");
-  client.println("<head>");
-  client.println("<meta charset=\"utf-8\" />");
-  client.println("<title>Sensors server</title>");
-  client.println("</head>");
-  client.println("<body>");
-  client.println("<h1>Sensors server</h1><br>You could get <a href=\"/temp\">temperature</a>, <a href=\"/humidity\">humidity</a> or <a href=\"/co2\">CO<sub>2</sub></a> values.");
-  client.println("</body>");
-  client.println("</html>");
+  client.println(F("<!DOCTYPE HTML>"));
+  client.println(F("<html>"));
+  client.println(F("<head>"));
+  client.println(F("<meta charset=\"utf-8\" />"));
+  client.println(F("<title>Sensors server</title>"));
+  client.println(F("</head>"));
+  client.println(F("<body>"));
+  client.println(F("<h1>Sensors server</h1><br>You could get <a href=\"/temp\">temperature</a>, <a href=\"/humidity\">humidity</a> or <a href=\"/co2\">CO<sub>2</sub></a> values."));
+  client.println(F("</body>"));
+  client.println(F("</html>"));
 }
 
 void action_temp(EthernetClient client) {
   update_sensors();
-  client.println("HTTP/1.1 200 OK");
-  client.println("Content-Type: text/plain");
-  client.println("Connection: close");
+  client.println(F("HTTP/1.1 200 OK"));
+  client.println(F("Content-Type: text/plain"));
+  client.println(F("Connection: close"));
   client.println();
-  client.print("Temperature: ");
+  client.print(F("Temperature: "));
   if (health_status) {
     client.print(temp_c);
   } else {
-    client.print("nan");
+    client.print(F("nan"));
   }
-  client.println(" C");
+  client.println(F(" C"));
 }
 
 void action_humidity(EthernetClient client) {
   update_sensors();
-  client.println("HTTP/1.1 200 OK");
-  client.println("Content-Type: text/plain");
-  client.println("Connection: close");
+  client.println(F("HTTP/1.1 200 OK"));
+  client.println(F("Content-Type: text/plain"));
+  client.println(F("Connection: close"));
   client.println();
-  client.print("Humidity: ");
+  client.print(F("Humidity: "));
   if (health_status) {
     client.print(humidity);
   } else {
-    client.print("nan");
+    client.print(F("nan"));
   }
-  client.println("%");
+  client.println(F("%"));
 }
 
 void action_co2(EthernetClient client) {
   update_sensors();
-  client.println("HTTP/1.1 200 OK");
-  client.println("Content-Type: text/plain");
-  client.println("Connection: close");
+  client.println(F("HTTP/1.1 200 OK"));
+  client.println(F("Content-Type: text/plain"));
+  client.println(F("Connection: close"));
   client.println();
-  client.print("CO2: ");
+  client.print(F("CO2: "));
   if (health_status) {
     client.print(co2_ppm);
   } else {
-    client.print("nan");
+    client.print(F("nan"));
   }
-  client.println(" ppm");
+  client.println(F(" ppm"));
 }
 
 void action_status_health(EthernetClient client) {
   if (health_status) {
-    client.println("HTTP/1.1 200 OK");
+    client.println(F("HTTP/1.1 200 OK"));
   } else {
-    client.println("HTTP/1.1 500 Internal Server Error");
+    client.println(F("HTTP/1.1 500 Internal Server Error"));
   }
-  client.println("Content-Type: text/plain");
-  client.println("Connection: close");
+  client.println(F("Content-Type: text/plain"));
+  client.println(F("Connection: close"));
   client.println();
   if (health_status) {
-    client.println("OK");
+    client.println(F("OK"));
   } else {
-    client.println("FAIL");
+    client.println(F("FAIL"));
   }
 }
 
@@ -102,12 +103,12 @@ void update_sensors() {
   currentMillis = millis();
   if (previousMillis > currentMillis) {
     previousMillis = 0;
-    Serial.println("millis() overflow");
+    Serial.println(F("millis() overflow"));
   }
   if (currentMillis - previousMillis >= updateInterval) {
-    Serial.print("Refreshing sensors at ");
+    Serial.print(F("Refreshing sensors at "));
     Serial.print(currentMillis);
-    Serial.println(" msec");
+    Serial.println(F(" msec"));
     previousMillis = currentMillis;
     health_status = false;
 
@@ -115,7 +116,7 @@ void update_sensors() {
     _temp_c = dht.readTemperature();
 
     if (isnan(_humidity) || isnan(_temp_c)) {
-      Serial.println("Failed to read data from DHT22");
+      Serial.println(F("Failed to read data from DHT22"));
       return;
     }
 
@@ -123,30 +124,30 @@ void update_sensors() {
     // Humidity: 0..100%
     // Temperature: -40C..50C
     if (_temp_c < -40.0 || _temp_c >= 50.0) {
-      Serial.println("Temperature value readed from DHT22 is out of range -40C .. 50C");
+      Serial.println(F("Temperature value readed from DHT22 is out of range -40C .. 50C"));
       return;
     }
     temp_c = _temp_c;
 
     if (_humidity < 0.0 || _humidity > 100) {
-      Serial.println("Humidity value readed from DHT22 is out of range 0%..100%");
+      Serial.println(F("Humidity value readed from DHT22 is out of range 0%..100%"));
       return;
     }
     humidity = _humidity;
 
     _co2_ppm = readCO2();
     if (isnan(_co2_ppm)) {
-      Serial.println("Failed to read data from MH-Z19");
+      Serial.println(F("Failed to read data from MH-Z19"));
       return;
     }
     if (_co2_ppm < 100 || _co2_ppm > 6000) {
-      Serial.println("CO2 value readed from MH-Z19 is out of range 100..5000 ppm");
+      Serial.println(F("CO2 value readed from MH-Z19 is out of range 100..5000 ppm"));
       return;
     }
     co2_ppm = _co2_ppm;
     health_status = true;
   } else {
-    Serial.println("Using cached sensor values");
+    Serial.println(F("Using cached sensor values"));
   }
 }
 
@@ -159,21 +160,21 @@ int readCO2()
   co2Serial.readBytes(response, 9);
 
   for (int i = 0; i < 9; i++) {
-    Serial.print("0x");
+    Serial.print(F("0x"));
     Serial.print(response[i], HEX);
-    Serial.print(" ");
+    Serial.print(F(" "));
   }
   Serial.println("");
 
   if (response[0] != 0xFF)
   {
-    Serial.println("Incorrect start byte from MH-Z19 sensor");
+    Serial.println(F("Incorrect start byte from MH-Z19 sensor"));
     return -1;
   }
 
   if (response[1] != 0x86)
   {
-    Serial.println("Incorrect response from MH-Z19 sensor");
+    Serial.println(F("Incorrect response from MH-Z19 sensor"));
     return -1;
   }
 
@@ -188,12 +189,14 @@ void setup() {
   co2Serial.begin(9600);
   Ethernet.begin(mac, ip);
   server.begin();
-  Serial.print("Server started at http://");
+  Serial.print(F("Server started at http://"));
   Serial.print(Ethernet.localIP());
-  Serial.println("/");
+  Serial.println(F("/"));
   dht.begin();
   // initial delay for device stabilization
   delay(updateInterval);
+  Serial.print("setup() free memory: ");
+  Serial.println(freeMemory());
 }
 
 void loop() {
@@ -239,5 +242,7 @@ void loop() {
     delay(1);
     client.stop();
     request = "";
+    Serial.print("loop() free memory: ");
+    Serial.println(freeMemory());
   }
 }
