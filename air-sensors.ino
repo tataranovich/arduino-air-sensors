@@ -1,15 +1,19 @@
-#include <MemoryFree.h>
+#include "wifi-config.h"
+
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <ESP8266WebServer.h>
 #include <SoftwareSerial.h>
 #include <DHT.h>
-#include <SPI.h>
-#include <Ethernet.h>
 
-byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-IPAddress ip(192,168,1,177);
-EthernetServer server(80);
-String request;
-DHT dht(2, DHT22);
-SoftwareSerial co2Serial(8, 9);
+#define DHT22_PIN 4
+#define MHZ19_TX_PIN 12
+#define MHZ19_RX_PIN 13
+
+String webString;
+ESP8266WebServer server(80);
+DHT dht(DHT22_PIN, DHT22);
+SoftwareSerial co2Serial(MHZ19_TX_PIN, MHZ19_RX_PIN);
 float humidity, temp_c, co2_ppm;
 bool health_status;
 
@@ -17,81 +21,46 @@ unsigned long currentMillis, previousMillis;
 // update sensors every 5s
 const long updateInterval = 5000;
 
-void action_index(EthernetClient client) {
-  client.println(F("HTTP/1.1 200 OK"));
-  client.println(F("Content-Type: text/html"));
-  client.println(F("Connection: close"));
-  client.println();
-  client.println(F("<!DOCTYPE HTML>"));
-  client.println(F("<html>"));
-  client.println(F("<head>"));
-  client.println(F("<meta charset=\"utf-8\" />"));
-  client.println(F("<title>Sensors server</title>"));
-  client.println(F("</head>"));
-  client.println(F("<body>"));
-  client.println(F("<h1>Sensors server</h1><br>You could get <a href=\"/temp\">temperature</a>, <a href=\"/humidity\">humidity</a> or <a href=\"/co2\">CO<sub>2</sub></a> values."));
-  client.println(F("</body>"));
-  client.println(F("</html>"));
+void action_index() {
+  server.send(200, "text/html", "<!DOCTYPE HTML><html><head><meta charset=\"utf-8\" /><title>Sensors server</title></head><body><h1>Sensors server</h1><br>You could get <a href=\"/temp\">temperature</a>, <a href=\"/humidity\">humidity</a> or <a href=\"/co2\">CO<sub>2</sub></a> values.</body></hml>");
+  delay(100);
 }
 
-void action_temp(EthernetClient client) {
+void action_temp() {
   update_sensors();
-  client.println(F("HTTP/1.1 200 OK"));
-  client.println(F("Content-Type: text/plain"));
-  client.println(F("Connection: close"));
-  client.println();
-  client.print(F("Temperature: "));
   if (health_status) {
-    client.print(temp_c);
+    webString = "Temperature: " + String(temp_c) + " C";
   } else {
-    client.print(F("nan"));
+    webString = "Temperature: nan C";
   }
-  client.println(F(" C"));
+  server.send(200, "text/plain", webString);
 }
 
-void action_humidity(EthernetClient client) {
+void action_humidity() {
   update_sensors();
-  client.println(F("HTTP/1.1 200 OK"));
-  client.println(F("Content-Type: text/plain"));
-  client.println(F("Connection: close"));
-  client.println();
-  client.print(F("Humidity: "));
   if (health_status) {
-    client.print(humidity);
+    webString = "Humidity: " + String(humidity) + "%";
   } else {
-    client.print(F("nan"));
+    webString = "Humidity: nan%";
   }
-  client.println(F("%"));
+  server.send(200, "text/plain", webString);
 }
 
-void action_co2(EthernetClient client) {
+void action_co2() {
   update_sensors();
-  client.println(F("HTTP/1.1 200 OK"));
-  client.println(F("Content-Type: text/plain"));
-  client.println(F("Connection: close"));
-  client.println();
-  client.print(F("CO2: "));
   if (health_status) {
-    client.print(co2_ppm);
+    webString = "CO2: " + String(co2_ppm) + " ppm";
   } else {
-    client.print(F("nan"));
+    webString = "CO2: nan ppm";
   }
-  client.println(F(" ppm"));
+  server.send(200, "text/plain", webString);
 }
 
-void action_status_health(EthernetClient client) {
+void action_status_health() {
   if (health_status) {
-    client.println(F("HTTP/1.1 200 OK"));
+    server.send(200, "text/plain", "OK");
   } else {
-    client.println(F("HTTP/1.1 500 Internal Server Error"));
-  }
-  client.println(F("Content-Type: text/plain"));
-  client.println(F("Connection: close"));
-  client.println();
-  if (health_status) {
-    client.println(F("OK"));
-  } else {
-    client.println(F("FAIL"));
+    server.send(500, "text/plain", "FAIL");
   }
 }
 
@@ -187,62 +156,35 @@ int readCO2()
 void setup() {
   Serial.begin(9600);
   co2Serial.begin(9600);
-  Ethernet.begin(mac, ip);
-  server.begin();
-  Serial.print(F("Server started at http://"));
-  Serial.print(Ethernet.localIP());
-  Serial.println(F("/"));
   dht.begin();
+
+  WiFi.begin(ssid, password);
+  Serial.print("\n\r\n\rWorking to connect");
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("Air sensors on esp8266");
+  Serial.print("Connected to ");
+  Serial.println(ssid);
+
+  server.on("/", action_index);
+  server.on("/temp", action_temp);
+  server.on("/humidity", action_humidity);
+  server.on("/co2", action_co2);
+  server.on("/status/health", action_status_health);
+
+  server.begin();
+  Serial.print("Server started at http://");
+  Serial.println(WiFi.localIP());
+
   // initial delay for device stabilization
   delay(updateInterval);
-  Serial.print("setup() free memory: ");
-  Serial.println(freeMemory());
 }
 
 void loop() {
-  EthernetClient client = server.available();
-  if (client) {
-    boolean currentLineIsBlank = true;
-    while (client.connected()) {
-      if (client.available()) {
-        char c = client.read();
-        // Limit request size to 1k
-        if (request.length() < 128) {
-          request += c;
-        }
-        if (c == '\n' && currentLineIsBlank) {
-          Serial.println(request);
-          if (request.indexOf("/temp") > 0) {
-            action_temp(client);
-            break;
-          }
-          if (request.indexOf("/humidity") > 0) {
-            action_humidity(client);
-            break;
-          }
-          if (request.indexOf("/co2") > 0) {
-            action_co2(client);
-            break;
-          }
-          if (request.indexOf("/status/health") > 0) {
-            action_status_health(client);
-            break;
-          }
-          // default response
-          action_index(client);
-          break;
-        }
-        if (c == '\n') {
-          currentLineIsBlank = true;
-        } else if (c != '\r') {
-          currentLineIsBlank = false;
-        }
-      }
-    }
-    delay(1);
-    client.stop();
-    request = "";
-    Serial.print("loop() free memory: ");
-    Serial.println(freeMemory());
-  }
+  server.handleClient();
 }
