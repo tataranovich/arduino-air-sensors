@@ -25,6 +25,7 @@ Adafruit_SSD1306 display;
 
 unsigned long currentMillis, previousMillis;
 unsigned long displayMillis;
+bool displayActive;
 // update sensors every 5s
 const long updateInterval = 5000;
 // show values on screen during 15s
@@ -124,7 +125,7 @@ void update_sensors() {
     }
     co2_ppm = _co2_ppm;
     health_status = true;
-    refresh_display();
+    update_display();
   } else {
     Serial.println(F("Using cached sensor values"));
   }
@@ -163,15 +164,16 @@ int readCO2()
   return ppm;
 }
 
-void refresh_display() {
+void update_display() {
   char str_temp[6];
   char str_humidity[6];
   char str_co2[6];
-  dtostrf(temp_c, 5, 1, str_temp);
-  dtostrf(humidity, 5, 1, str_humidity);
-  dtostrf(co2_ppm, 5, 0, str_co2);
-  display.clearDisplay();
-  if (displayMillis > millis()) {
+  currentMillis = millis();
+  if (displayMillis > currentMillis && !displayActive) {
+    display.clearDisplay();
+    dtostrf(temp_c, 5, 1, str_temp);
+    dtostrf(humidity, 5, 1, str_humidity);
+    dtostrf(co2_ppm, 5, 0, str_co2);
     display.setCursor(0, 10);
     display.setFont(&FreeMono9pt7b);
     display.print("T  ");
@@ -183,8 +185,15 @@ void refresh_display() {
     display.print("CO2");
     display.print(str_co2);
     display.println("ppm");
+    display.display();
+    displayActive = true;
+  } else {
+    if (displayMillis <= currentMillis && displayActive) {
+      display.clearDisplay();
+      display.display();
+      displayActive = false;
+    }
   }
-  display.display();
 }
 
 void setup() {
@@ -238,6 +247,7 @@ void setup() {
   // OLED burnout protection
   pinMode(0, INPUT);
   displayMillis = millis() + displayTimeout;
+  displayActive = false;
   update_sensors();
 }
 
@@ -246,10 +256,5 @@ void loop() {
   if (digitalRead(0) == LOW) {
     displayMillis = millis() + displayTimeout;
   }
-  if (displayMillis < millis()) {
-    display.clearDisplay();
-    display.display();
-  } else {
-    refresh_display();
-  }
+  update_display();
 }
