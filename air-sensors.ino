@@ -5,8 +5,13 @@
 #include <ESP8266WebServer.h>
 #include <SoftwareSerial.h>
 #include <DHT.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <Fonts/FreeMono9pt7b.h>
 
-#define DHT22_PIN 4
+#define DHT22_PIN 14
 #define MHZ19_TX_PIN 12
 #define MHZ19_RX_PIN 13
 
@@ -16,10 +21,15 @@ DHT dht(DHT22_PIN, DHT22);
 SoftwareSerial co2Serial(MHZ19_TX_PIN, MHZ19_RX_PIN);
 float humidity, temp_c, co2_ppm;
 bool health_status;
+Adafruit_SSD1306 display;
 
 unsigned long currentMillis, previousMillis;
+unsigned long displayMillis;
+bool displayActive;
 // update sensors every 5s
 const long updateInterval = 5000;
+// show values on screen during 15s
+const long displayTimeout = 15000;
 
 void action_index() {
   server.send(200, "text/html", "<!DOCTYPE HTML><html><head><meta charset=\"utf-8\" /><title>Sensors server</title></head><body><h1>Sensors server</h1><br>You could get <a href=\"/temp\">temperature</a>, <a href=\"/humidity\">humidity</a> or <a href=\"/co2\">CO<sub>2</sub></a> values.</body></hml>");
@@ -115,6 +125,7 @@ void update_sensors() {
     }
     co2_ppm = _co2_ppm;
     health_status = true;
+    update_display();
   } else {
     Serial.println(F("Using cached sensor values"));
   }
@@ -153,7 +164,46 @@ int readCO2()
   return ppm;
 }
 
+void update_display() {
+  char str_temp[6];
+  char str_humidity[6];
+  char str_co2[6];
+  currentMillis = millis();
+  if (displayMillis > currentMillis && !displayActive) {
+    display.clearDisplay();
+    dtostrf(temp_c, 5, 1, str_temp);
+    dtostrf(humidity, 5, 1, str_humidity);
+    dtostrf(co2_ppm, 5, 0, str_co2);
+    display.setCursor(0, 10);
+    display.setFont(&FreeMono9pt7b);
+    display.print("T  ");
+    display.print(str_temp);
+    display.println("C");
+    display.print("RH ");
+    display.print(str_humidity);
+    display.println("%");
+    display.print("CO2");
+    display.print(str_co2);
+    display.println("ppm");
+    display.ssd1306_command(SSD1306_DISPLAYON);
+    display.display();
+    displayActive = true;
+  } else {
+    if (displayMillis <= currentMillis && displayActive) {
+      display.ssd1306_command(SSD1306_DISPLAYOFF);
+      displayActive = false;
+    }
+  }
+}
+
 void setup() {
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.clearDisplay();
+  display.setTextColor(WHITE);
+  display.setFont();
+  display.setCursor(0, 0);
+  display.println("Starting...");
+  display.display();
   Serial.begin(9600);
   co2Serial.begin(9600);
   dht.begin();
@@ -170,6 +220,11 @@ void setup() {
   Serial.println("Air sensors on esp8266");
   Serial.print("Connected to ");
   Serial.println(ssid);
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.print("WiFi: ");
+  display.println(ssid);
+  display.display();
 
   server.on("/", action_index);
   server.on("/temp", action_temp);
@@ -180,11 +235,26 @@ void setup() {
   server.begin();
   Serial.print("Server started at http://");
   Serial.println(WiFi.localIP());
+  display.print("IP: ");
+  display.println(WiFi.localIP());
+  display.display();
 
   // initial delay for device stabilization
+  display.println("Sensors preheat...");
+  display.display();
   delay(updateInterval);
+
+  // OLED burnout protection
+  pinMode(0, INPUT);
+  displayMillis = millis() + displayTimeout;
+  displayActive = false;
+  update_sensors();
 }
 
 void loop() {
   server.handleClient();
+  if (digitalRead(0) == LOW) {
+    displayMillis = millis() + displayTimeout;
+  }
+  update_display();
 }
