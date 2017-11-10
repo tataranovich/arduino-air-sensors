@@ -24,8 +24,11 @@ bool health_status;
 Adafruit_SSD1306 display;
 
 unsigned long currentMillis, previousMillis;
+unsigned long displayMillis;
 // update sensors every 5s
 const long updateInterval = 5000;
+// show values on screen during 15s
+const long displayTimeout = 15000;
 
 void action_index() {
   server.send(200, "text/html", "<!DOCTYPE HTML><html><head><meta charset=\"utf-8\" /><title>Sensors server</title></head><body><h1>Sensors server</h1><br>You could get <a href=\"/temp\">temperature</a>, <a href=\"/humidity\">humidity</a> or <a href=\"/co2\">CO<sub>2</sub></a> values.</body></hml>");
@@ -168,17 +171,19 @@ void refresh_display() {
   dtostrf(humidity, 5, 1, str_humidity);
   dtostrf(co2_ppm, 5, 0, str_co2);
   display.clearDisplay();
-  display.setCursor(0, 10);
-  display.setFont(&FreeMono9pt7b);
-  display.print("T  ");
-  display.print(str_temp);
-  display.println("C");
-  display.print("RH ");
-  display.print(str_humidity);
-  display.println("%");
-  display.print("CO2");
-  display.print(str_co2);
-  display.println("ppm");
+  if (displayMillis > millis()) {
+    display.setCursor(0, 10);
+    display.setFont(&FreeMono9pt7b);
+    display.print("T  ");
+    display.print(str_temp);
+    display.println("C");
+    display.print("RH ");
+    display.print(str_humidity);
+    display.println("%");
+    display.print("CO2");
+    display.print(str_co2);
+    display.println("ppm");
+  }
   display.display();
 }
 
@@ -229,9 +234,22 @@ void setup() {
   display.println("Sensors preheat...");
   display.display();
   delay(updateInterval);
+
+  // OLED burnout protection
+  pinMode(0, INPUT);
+  displayMillis = millis() + displayTimeout;
   update_sensors();
 }
 
 void loop() {
   server.handleClient();
+  if (digitalRead(0) == LOW) {
+    displayMillis = millis() + displayTimeout;
+  }
+  if (displayMillis < millis()) {
+    display.clearDisplay();
+    display.display();
+  } else {
+    refresh_display();
+  }
 }
