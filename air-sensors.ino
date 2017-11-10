@@ -9,6 +9,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <Fonts/FreeMono9pt7b.h>
 
 #define DHT22_PIN 14
 #define MHZ19_TX_PIN 12
@@ -163,18 +164,19 @@ void refresh_display() {
   char str_temp[6];
   char str_humidity[6];
   char str_co2[6];
-  dtostrf(temp_c, 4, 1, str_temp);
-  dtostrf(humidity, 4, 1, str_humidity);
-  dtostrf(co2_ppm, 4, 0, str_co2);
+  dtostrf(temp_c, 5, 1, str_temp);
+  dtostrf(humidity, 5, 1, str_humidity);
+  dtostrf(co2_ppm, 5, 0, str_co2);
   display.clearDisplay();
-  display.setCursor(0, 0);
-  display.print("Temp: ");
+  display.setCursor(0, 10);
+  display.setFont(&FreeMono9pt7b);
+  display.print("T  ");
   display.print(str_temp);
   display.println("C");
-  display.print("  RH: ");
+  display.print("RH ");
   display.print(str_humidity);
   display.println("%");
-  display.print(" CO2: ");
+  display.print("CO2");
   display.print(str_co2);
   display.println("ppm");
   display.display();
