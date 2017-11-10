@@ -5,8 +5,12 @@
 #include <ESP8266WebServer.h>
 #include <SoftwareSerial.h>
 #include <DHT.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 
-#define DHT22_PIN 4
+#define DHT22_PIN 14
 #define MHZ19_TX_PIN 12
 #define MHZ19_RX_PIN 13
 
@@ -16,6 +20,7 @@ DHT dht(DHT22_PIN, DHT22);
 SoftwareSerial co2Serial(MHZ19_TX_PIN, MHZ19_RX_PIN);
 float humidity, temp_c, co2_ppm;
 bool health_status;
+Adafruit_SSD1306 display;
 
 unsigned long currentMillis, previousMillis;
 // update sensors every 5s
@@ -154,6 +159,8 @@ int readCO2()
 }
 
 void setup() {
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.display();
   Serial.begin(9600);
   co2Serial.begin(9600);
   dht.begin();
