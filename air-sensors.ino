@@ -120,6 +120,7 @@ void update_sensors() {
     }
     co2_ppm = _co2_ppm;
     health_status = true;
+    refresh_display();
   } else {
     Serial.println(F("Using cached sensor values"));
   }
@@ -159,11 +160,23 @@ int readCO2()
 }
 
 void refresh_display() {
+  char str_temp[6];
+  char str_humidity[6];
+  char str_co2[6];
+  dtostrf(temp_c, 4, 1, str_temp);
+  dtostrf(humidity, 4, 1, str_humidity);
+  dtostrf(co2_ppm, 4, 0, str_co2);
   display.clearDisplay();
   display.setCursor(0, 0);
-  display.println("Temp: 24.00C");
-  display.println("  RH: 38.40%");
-  display.println(" CO2: 823ppm");
+  display.print("Temp: ");
+  display.print(str_temp);
+  display.println("C");
+  display.print("  RH: ");
+  display.print(str_humidity);
+  display.println("%");
+  display.print(" CO2: ");
+  display.print(str_co2);
+  display.println("ppm");
   display.display();
 }
 
@@ -214,7 +227,7 @@ void setup() {
   display.println("Sensors preheat...");
   display.display();
   delay(updateInterval);
-  refresh_display();
+  update_sensors();
 }
 
 void loop() {
