@@ -158,8 +158,22 @@ int readCO2()
   return ppm;
 }
 
+void refresh_display() {
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("Temp: 24.00C");
+  display.println("  RH: 38.40%");
+  display.println(" CO2: 823ppm");
+  display.display();
+}
+
 void setup() {
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.clearDisplay();
+  display.setTextColor(WHITE);
+  display.setFont();
+  display.setCursor(0, 0);
+  display.println("Starting...");
   display.display();
   Serial.begin(9600);
   co2Serial.begin(9600);
@@ -177,6 +191,11 @@ void setup() {
   Serial.println("Air sensors on esp8266");
   Serial.print("Connected to ");
   Serial.println(ssid);
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.print("WiFi: ");
+  display.println(ssid);
+  display.display();
 
   server.on("/", action_index);
   server.on("/temp", action_temp);
@@ -187,9 +206,15 @@ void setup() {
   server.begin();
   Serial.print("Server started at http://");
   Serial.println(WiFi.localIP());
+  display.print("IP: ");
+  display.println(WiFi.localIP());
+  display.display();
 
   // initial delay for device stabilization
+  display.println("Sensors preheat...");
+  display.display();
   delay(updateInterval);
+  refresh_display();
 }
 
 void loop() {
