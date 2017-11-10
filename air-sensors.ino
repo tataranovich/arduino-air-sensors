@@ -185,12 +185,12 @@ void update_display() {
     display.print("CO2");
     display.print(str_co2);
     display.println("ppm");
+    display.ssd1306_command(SSD1306_DISPLAYON);
     display.display();
     displayActive = true;
   } else {
     if (displayMillis <= currentMillis && displayActive) {
-      display.clearDisplay();
-      display.display();
+      display.ssd1306_command(SSD1306_DISPLAYOFF);
       displayActive = false;
     }
   }
