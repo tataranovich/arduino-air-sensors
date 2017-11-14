@@ -208,6 +208,7 @@ void setup() {
   co2Serial.begin(9600);
   dht.begin();
 
+  WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Serial.print("\n\r\n\rWorking to connect");
 
