@@ -14,7 +14,7 @@
 #include <Adafruit_SSD1306.h>
 #include <Fonts/FreeMono9pt7b.h>
 
-Adafruit_SSD1306 display;
+Adafruit_SSD1306 display(128, 64);
 #endif
 
 #ifdef HAVE_MH_Z19
@@ -262,15 +262,25 @@ void update_display() {
     dtostrf(co2_ppm, 5, 0, str_co2);
     display.setCursor(0, 10);
     display.setFont(&FreeMono9pt7b);
+
+    #ifdef HAVE_TEMP_SENSOR
     display.print("T  ");
     display.print(str_temp);
     display.println("C");
+    #endif
+
+    #ifdef HAVE_HUMID_SENSOR
     display.print("RH ");
     display.print(str_humidity);
     display.println("%");
+    #endif
+
+    #ifdef HAVE_CO2_SENSOR
     display.print("CO2");
     display.print(str_co2);
     display.println("ppm");
+    #endif
+
     display.ssd1306_command(SSD1306_DISPLAYON);
     display.display();
     displayActive = true;
@@ -335,7 +345,7 @@ void setup() {
   display.clearDisplay();
   display.setCursor(0, 0);
   display.print("WiFi: ");
-  display.println(ssid);
+  display.println(wifi_ssid);
   display.display();
   #endif
 
