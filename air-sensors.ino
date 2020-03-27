@@ -260,7 +260,6 @@ void update_display() {
   char str_co2[6];
   currentMillis = millis();
   if (displayMillis > currentMillis && !displayActive) {
-    update_sensors();
     display.clearDisplay();
     dtostrf(temp_c, 5, 1, str_temp);
     dtostrf(humidity, 5, 1, str_humidity);
@@ -376,6 +375,8 @@ void setup() {
   displayMillis = millis() + displayTimeout;
   displayActive = false;
   #endif
+
+  update_sensors();
 }
 
 void loop() {
@@ -383,7 +384,8 @@ void loop() {
   #ifdef HAVE_SSD1306
   if (digitalRead(0) == LOW) {
     displayMillis = millis() + displayTimeout;
+    update_sensors();
   }
-  #endif
   update_display();
+  #endif
 }
