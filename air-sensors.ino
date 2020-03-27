@@ -1,138 +1,31 @@
-#include "wifi-config.h"
+#include "config.h"
 
+#ifdef HAVE_ESP8266
 #include <ESP8266WiFi.h>
-#include <WiFiClient.h>
 #include <ESP8266WebServer.h>
-#include <SoftwareSerial.h>
-#include <DHT.h>
+#endif
+
 #include <SPI.h>
 #include <Wire.h>
+
+#ifdef HAVE_SSD1306
+#define HAVE_DISPLAY
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Fonts/FreeMono9pt7b.h>
 
-#define DHT22_PIN 14
-#define MHZ19_TX_PIN 12
-#define MHZ19_RX_PIN 13
-
-String webString;
-ESP8266WebServer server(80);
-DHT dht(DHT22_PIN, DHT22);
-SoftwareSerial co2Serial(MHZ19_TX_PIN, MHZ19_RX_PIN);
-float humidity, temp_c, co2_ppm;
-bool health_status;
 Adafruit_SSD1306 display;
+#endif
 
-unsigned long currentMillis, previousMillis;
-unsigned long displayMillis;
-bool displayActive;
-// update sensors every 5s
-const long updateInterval = 5000;
-// show values on screen during 15s
-const long displayTimeout = 15000;
+#ifdef HAVE_MH_Z19
+#include <SoftwareSerial.h>
+#define HAVE_CO2_SENSOR
+#define CO2_MIN 100
+#define CO2_MAX 6000
 
-void action_index() {
-  server.send(200, "text/html", "<!DOCTYPE HTML><html><head><meta charset=\"utf-8\" /><title>Sensors server</title></head><body><h1>Sensors server</h1><br>You could get <a href=\"/temp\">temperature</a>, <a href=\"/humidity\">humidity</a> or <a href=\"/co2\">CO<sub>2</sub></a> values.</body></hml>");
-  delay(100);
-}
+SoftwareSerial co2Serial(MHZ19_TX_PIN, MHZ19_RX_PIN);
 
-void action_temp() {
-  update_sensors();
-  if (health_status) {
-    webString = "Temperature: " + String(temp_c) + " C";
-  } else {
-    webString = "Temperature: nan C";
-  }
-  server.send(200, "text/plain", webString);
-}
-
-void action_humidity() {
-  update_sensors();
-  if (health_status) {
-    webString = "Humidity: " + String(humidity) + "%";
-  } else {
-    webString = "Humidity: nan%";
-  }
-  server.send(200, "text/plain", webString);
-}
-
-void action_co2() {
-  update_sensors();
-  if (health_status) {
-    webString = "CO2: " + String(co2_ppm) + " ppm";
-  } else {
-    webString = "CO2: nan ppm";
-  }
-  server.send(200, "text/plain", webString);
-}
-
-void action_status_health() {
-  if (health_status) {
-    server.send(200, "text/plain", "OK");
-  } else {
-    server.send(500, "text/plain", "FAIL");
-  }
-}
-
-void update_sensors() {
-  float _humidity;
-  float _temp_c;
-  int _co2_ppm;
-
-  currentMillis = millis();
-  if (previousMillis > currentMillis) {
-    previousMillis = 0;
-    Serial.println(F("millis() overflow"));
-  }
-  if (currentMillis - previousMillis >= updateInterval) {
-    Serial.print(F("Refreshing sensors at "));
-    Serial.print(currentMillis);
-    Serial.println(F(" msec"));
-    previousMillis = currentMillis;
-    health_status = false;
-
-    _humidity = dht.readHumidity();
-    _temp_c = dht.readTemperature();
-
-    if (isnan(_humidity) || isnan(_temp_c)) {
-      Serial.println(F("Failed to read data from DHT22"));
-      return;
-    }
-
-    // DHT22 measurements range
-    // Humidity: 0..100%
-    // Temperature: -40C..50C
-    if (_temp_c < -40.0 || _temp_c >= 50.0) {
-      Serial.println(F("Temperature value readed from DHT22 is out of range -40C .. 50C"));
-      return;
-    }
-    temp_c = _temp_c;
-
-    if (_humidity < 0.0 || _humidity > 100) {
-      Serial.println(F("Humidity value readed from DHT22 is out of range 0%..100%"));
-      return;
-    }
-    humidity = _humidity;
-
-    _co2_ppm = readCO2();
-    if (isnan(_co2_ppm)) {
-      Serial.println(F("Failed to read data from MH-Z19"));
-      return;
-    }
-    if (_co2_ppm < 100 || _co2_ppm > 6000) {
-      Serial.println(F("CO2 value readed from MH-Z19 is out of range 100..5000 ppm"));
-      return;
-    }
-    co2_ppm = _co2_ppm;
-    health_status = true;
-    update_display();
-  } else {
-    Serial.println(F("Using cached sensor values"));
-  }
-}
-
-int readCO2()
-{
+int sensorCO2() {
   byte cmd[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
   byte response[9];
 
@@ -163,8 +56,201 @@ int readCO2()
   int ppm = (256 * responseHigh) + responseLow;
   return ppm;
 }
+#endif
+
+#ifdef HAVE_DHT22
+#include <DHT.h>
+
+#define HAVE_TEMP_SENSOR
+#define HAVE_HUMID_SENSOR
+#define TEMP_MIN -40
+#define TEMP_MAX 50
+#define HUMID_MIN 0
+#define HUMID_MAX 100
+
+DHT dht(DHT22_PIN, DHT22);
+
+float sensorTemperature() {
+  return dht.readTemperature();
+}
+
+float sensorHumidity() {
+  return dht.readHumidity();
+}
+#endif
+
+#ifdef HAVE_SI7021
+#include <Adafruit_Si7021.h>
+
+#define HAVE_TEMP_SENSOR
+#define HAVE_HUMID_SENSOR
+#define TEMP_MIN -40
+#define TEMP_MAX 50
+#define HUMID_MIN 0
+#define HUMID_MAX 100
+
+Adafruit_Si7021 si7021 = Adafruit_Si7021();
+
+float sensorTemperature() {
+  return si7021.readTemperature();
+}
+
+float sensorHumidity() {
+  return si7021.readHumidity();
+}
+#endif
+
+#ifdef HAVE_BME280
+#include <Adafruit_BME280.h>
+
+#define HAVE_TEMP_SENSOR
+#define HAVE_HUMID_SENSOR
+#define TEMP_MIN -40
+#define TEMP_MAX 50
+#define HUMID_MIN 0
+#define HUMID_MAX 100
+
+Adafruit_BME280 bme;
+
+float sensorTemperature() {
+  return bme.readTemperature();
+}
+
+float sensorHumidity() {
+  return bme.readHumidity();
+}
+#endif
+
+String webString;
+ESP8266WebServer server(80);
+
+float humidity, temp_c, co2_ppm;
+bool health_status;
+
+unsigned long currentMillis, previousMillis;
+const long updateInterval = 5000; // update sensors every 5s
+#ifdef HAVE_SSD1306
+unsigned long displayMillis;
+bool displayActive;
+const long displayTimeout = 15000; // show values on screen during 15s
+#endif
+
+void action_index() {
+  server.send(200, "text/html", "<!DOCTYPE HTML><html><head><meta charset=\"utf-8\" /><title>Sensors server</title></head><body><h1>Sensors server</h1><br>You could get <a href=\"/temp\">temperature</a>, <a href=\"/humidity\">humidity</a> or <a href=\"/co2\">CO<sub>2</sub></a> values.</body></hml>");
+  delay(100);
+}
+
+void action_temp() {
+  #ifdef HAVE_TEMP_SENSOR
+  update_sensors();
+  if (health_status) {
+    webString = "Temperature: " + String(temp_c) + " C";
+  } else {
+    webString = "Temperature: nan C";
+  }
+  server.send(200, "text/plain", webString);
+  #else
+  server.send(404, "text/plain", "Temperature is not supported");
+  #endif
+}
+
+void action_humidity() {
+  #ifdef HAVE_HUMID_SENSOR
+  update_sensors();
+  if (health_status) {
+    webString = "Humidity: " + String(humidity) + "%";
+  } else {
+    webString = "Humidity: nan%";
+  }
+  server.send(200, "text/plain", webString);
+  #else
+  server.send(404, "text/plain", "Humidity is not supported");
+  #endif
+}
+
+void action_co2() {
+  #ifdef HAVE_CO2_SENSOR
+  update_sensors();
+  if (health_status) {
+    webString = "CO2: " + String(co2_ppm) + " ppm";
+  } else {
+    webString = "CO2: nan ppm";
+  }
+  server.send(200, "text/plain", webString);
+  #else
+  server.send(404, "text/plain", "CO2 is not supported");
+  #endif
+}
+
+void action_status_health() {
+  if (health_status) {
+    server.send(200, "text/plain", "OK");
+  } else {
+    server.send(500, "text/plain", "FAIL");
+  }
+}
+
+void update_sensors() {
+  #ifdef HAVE_HUMID_SENSOR
+  float _humidity;
+  #endif
+
+  #ifdef HAVE_TEMP_SENSOR
+  float _temp_c;
+  #endif
+
+  #ifdef HAVE_CO2_SENSOR
+  int _co2_ppm;
+  #endif
+
+  currentMillis = millis();
+  if (previousMillis > currentMillis) {
+    previousMillis = 0;
+    Serial.println(F("millis() overflow"));
+  }
+  if (currentMillis - previousMillis >= updateInterval) {
+    Serial.print(F("Refreshing sensors at "));
+    Serial.print(currentMillis);
+    Serial.println(F(" msec"));
+    previousMillis = currentMillis;
+    health_status = false;
+
+    #ifdef HAVE_TEMP_SENSOR
+    _temp_c = sensorTemperature();
+    if (isnan(_temp_c) || _temp_c < TEMP_MIN || _temp_c > TEMP_MAX) {
+      Serial.println(F("Failed to read temperature"));
+      return;
+    }
+    temp_c = _temp_c;
+    #endif
+
+    #ifdef HAVE_HUMID_SENSOR
+    _humidity = sensorHumidity();
+    if (isnan(_humidity) || _humidity < HUMID_MIN || _humidity > HUMID_MAX) {
+      Serial.println(F("Failed to read humidity"));
+      return;
+    }
+    humidity = _humidity;
+    #endif
+
+    #ifdef HAVE_CO2_SENSOR
+    _co2_ppm = sensorCO2();
+    if (isnan(_co2_ppm) || _co2_ppm < CO2_MIN || _co2_ppm > CO2_MAX) {
+      Serial.println(F("Failed to read CO2"));
+      return;
+    }
+    co2_ppm = _co2_ppm;
+    #endif
+
+    health_status = true;
+    update_display();
+  } else {
+    Serial.println(F("Using cached sensor values"));
+  }
+}
 
 void update_display() {
+  #ifdef HAVE_SSD1306
   char str_temp[6];
   char str_humidity[6];
   char str_co2[6];
@@ -194,9 +280,11 @@ void update_display() {
       displayActive = false;
     }
   }
+  #endif
 }
 
 void setup() {
+  #ifdef HAVE_SSD1306
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.clearDisplay();
   display.setTextColor(WHITE);
@@ -204,12 +292,33 @@ void setup() {
   display.setCursor(0, 0);
   display.println("Starting...");
   display.display();
-  Serial.begin(9600);
+  #endif
+
+  Serial.begin(115200);
+
+  #if defined(HAVE_BME280) || defined(HAVE_SI7021)
+  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+  Wire.setClock(100000);
+  #endif
+
+  #ifdef HAVE_MH_Z19
   co2Serial.begin(9600);
+  #endif
+
+  #ifdef HAVE_DHT22
   dht.begin();
+  #endif
+
+  #ifdef HAVE_SI7021
+  si7021.begin();
+  #endif
+
+  #ifdef HAVE_BME280
+  bme.begin(BME280_I2C_ADDRESS);
+  #endif
 
   WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
+  WiFi.begin(wifi_ssid, wifi_password);
   Serial.print("\n\r\n\rWorking to connect");
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -220,12 +329,15 @@ void setup() {
   Serial.println("");
   Serial.println("Air sensors on esp8266");
   Serial.print("Connected to ");
-  Serial.println(ssid);
+  Serial.println(wifi_ssid);
+
+  #ifdef HAVE_SSD1306
   display.clearDisplay();
   display.setCursor(0, 0);
   display.print("WiFi: ");
   display.println(ssid);
   display.display();
+  #endif
 
   server.on("/", action_index);
   server.on("/temp", action_temp);
@@ -236,26 +348,33 @@ void setup() {
   server.begin();
   Serial.print("Server started at http://");
   Serial.println(WiFi.localIP());
+
+  #ifdef HAVE_SSD1306
   display.print("IP: ");
   display.println(WiFi.localIP());
   display.display();
-
   // initial delay for device stabilization
   display.println("Sensors preheat...");
   display.display();
+  #endif
   delay(updateInterval);
 
+  #ifdef HAVE_SSD1306
   // OLED burnout protection
   pinMode(0, INPUT);
   displayMillis = millis() + displayTimeout;
   displayActive = false;
+  #endif
+
   update_sensors();
 }
 
 void loop() {
   server.handleClient();
+  #ifdef HAVE_SSD1306
   if (digitalRead(0) == LOW) {
     displayMillis = millis() + displayTimeout;
   }
+  #endif
   update_display();
 }

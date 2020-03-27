@@ -1,6 +1,6 @@
 # Air sensors
 
-Temperature, relative humidity and carbon dioxide sensors using DHT22 and MH-Z19 on top of ESP8266 controller.
+Temperature, relative humidity and carbon dioxide sensors using DHT22, BME280, SI7021 and MH-Z19 on top of ESP8266 controller.
 
 ## API
 
