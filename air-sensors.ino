@@ -18,19 +18,23 @@ Adafruit_SSD1306 display(128, 64);
 #endif
 
 #ifdef HAVE_MH_Z19
-#include <SoftwareSerial.h>
 #define HAVE_CO2_SENSOR
 #define CO2_MIN 100
 #define CO2_MAX 6000
-
-SoftwareSerial co2Serial(MHZ19_TX_PIN, MHZ19_RX_PIN);
 
 int sensorCO2() {
   byte cmd[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
   byte response[9];
 
-  co2Serial.write(cmd, 9); //request PPM CO2
-  co2Serial.readBytes(response, 9);
+  // See https://arduino-esp8266.readthedocs.io/en/latest/reference.html#serial for details
+  // Switch UART0 from GPIO1 (TX) and GPIO3 (RX) to GPIO15 (TX) and GPIO13 (RX)
+  Serial.flush();
+  Serial.swap();
+  Serial.write(cmd, 9); //request PPM CO2
+  Serial.readBytes(response, 9);
+  // Switch UART0 from GPIO15 (TX) and GPIO13 (RX) back to GPIO1 (TX) and GPIO3 (RX)
+  Serial.flush();
+  Serial.swap();
 
   for (int i = 0; i < 9; i++) {
     Serial.print(F("0x"));
@@ -256,6 +260,7 @@ void update_display() {
   char str_co2[6];
   currentMillis = millis();
   if (displayMillis > currentMillis && !displayActive) {
+    update_sensors();
     display.clearDisplay();
     dtostrf(temp_c, 5, 1, str_temp);
     dtostrf(humidity, 5, 1, str_humidity);
@@ -304,15 +309,11 @@ void setup() {
   display.display();
   #endif
 
-  Serial.begin(115200);
+  Serial.begin(9600);
 
   #if defined(HAVE_BME280) || defined(HAVE_SI7021)
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
   Wire.setClock(100000);
-  #endif
-
-  #ifdef HAVE_MH_Z19
-  co2Serial.begin(9600);
   #endif
 
   #ifdef HAVE_DHT22
@@ -375,8 +376,6 @@ void setup() {
   displayMillis = millis() + displayTimeout;
   displayActive = false;
   #endif
-
-  update_sensors();
 }
 
 void loop() {

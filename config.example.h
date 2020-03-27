@@ -5,9 +5,7 @@
 //#define HAVE_MH_Z19
 //#define HAVE_SSD1306
 
-#define DHT22_PIN 2
-#define MHZ19_TX_PIN 12
-#define MHZ19_RX_PIN 13
+#define DHT22_PIN 14
 #define BME280_I2C_ADDRESS 0x76
 #define I2C_SDA_PIN 4
 #define I2C_SCL_PIN 5
