@@ -9,6 +9,7 @@
 #define BME280_I2C_ADDRESS 0x76
 #define I2C_SDA_PIN 4
 #define I2C_SCL_PIN 5
+//#define SWAP_UART0
 
 const char* wifi_ssid     = "wifi_ssid";
 const char* wifi_password = "wifi_key";

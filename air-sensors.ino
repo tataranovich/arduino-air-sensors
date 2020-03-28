@@ -22,36 +22,30 @@ Adafruit_SSD1306 display(128, 64);
 #define CO2_MIN 100
 #define CO2_MAX 6000
 
+#if defined(HAVE_MH_Z19) && defined(SWAP_UART0)
+  #define DPRINT(...)
+  #define DPRINTLN(...)
+#else
+  #define DPRINT(...)    Serial.print(__VA_ARGS__)
+  #define DPRINTLN(...)  Serial.println(__VA_ARGS__)
+#endif
+
 int sensorCO2() {
   byte cmd[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
   byte response[9];
 
-  // See https://arduino-esp8266.readthedocs.io/en/latest/reference.html#serial for details
-  // Switch UART0 from GPIO1 (TX) and GPIO3 (RX) to GPIO15 (TX) and GPIO13 (RX)
-  Serial.flush();
-  Serial.swap();
   Serial.write(cmd, 9); //request PPM CO2
   Serial.readBytes(response, 9);
-  // Switch UART0 from GPIO15 (TX) and GPIO13 (RX) back to GPIO1 (TX) and GPIO3 (RX)
-  Serial.flush();
-  Serial.swap();
-
-  for (int i = 0; i < 9; i++) {
-    Serial.print(F("0x"));
-    Serial.print(response[i], HEX);
-    Serial.print(F(" "));
-  }
-  Serial.println("");
 
   if (response[0] != 0xFF)
   {
-    Serial.println(F("Incorrect start byte from MH-Z19 sensor"));
+    DPRINTLN(F("Incorrect start byte from MH-Z19 sensor"));
     return -1;
   }
 
   if (response[1] != 0x86)
   {
-    Serial.println(F("Incorrect response from MH-Z19 sensor"));
+    DPRINTLN(F("Incorrect response from MH-Z19 sensor"));
     return -1;
   }
 
@@ -210,19 +204,19 @@ void update_sensors() {
   currentMillis = millis();
   if (previousMillis > currentMillis) {
     previousMillis = 0;
-    Serial.println(F("millis() overflow"));
+    DPRINTLN(F("millis() overflow"));
   }
   if (currentMillis - previousMillis >= updateInterval) {
-    Serial.print(F("Refreshing sensors at "));
-    Serial.print(currentMillis);
-    Serial.println(F(" msec"));
+    DPRINT(F("Refreshing sensors at "));
+    DPRINT(currentMillis);
+    DPRINTLN(F(" msec"));
     previousMillis = currentMillis;
     health_status = false;
 
     #ifdef HAVE_TEMP_SENSOR
     _temp_c = sensorTemperature();
     if (isnan(_temp_c) || _temp_c < TEMP_MIN || _temp_c > TEMP_MAX) {
-      Serial.println(F("Failed to read temperature"));
+      DPRINTLN(F("Failed to read temperature"));
       return;
     }
     temp_c = _temp_c;
@@ -231,7 +225,7 @@ void update_sensors() {
     #ifdef HAVE_HUMID_SENSOR
     _humidity = sensorHumidity();
     if (isnan(_humidity) || _humidity < HUMID_MIN || _humidity > HUMID_MAX) {
-      Serial.println(F("Failed to read humidity"));
+      DPRINTLN(F("Failed to read humidity"));
       return;
     }
     humidity = _humidity;
@@ -240,7 +234,7 @@ void update_sensors() {
     #ifdef HAVE_CO2_SENSOR
     _co2_ppm = sensorCO2();
     if (isnan(_co2_ppm) || _co2_ppm < CO2_MIN || _co2_ppm > CO2_MAX) {
-      Serial.println(F("Failed to read CO2"));
+      DPRINTLN(F("Failed to read CO2"));
       return;
     }
     co2_ppm = _co2_ppm;
@@ -249,7 +243,7 @@ void update_sensors() {
     health_status = true;
     update_display();
   } else {
-    Serial.println(F("Using cached sensor values"));
+    DPRINTLN(F("Using cached sensor values"));
   }
 }
 
@@ -309,6 +303,11 @@ void setup() {
   #endif
 
   Serial.begin(9600);
+  #ifdef SWAP_UART0
+  // See https://arduino-esp8266.readthedocs.io/en/latest/reference.html#serial for details
+  // Switch UART0 from GPIO1 (TX) and GPIO3 (RX) to GPIO15 (TX) and GPIO13 (RX)
+  Serial.swap();
+  #endif
 
   #if defined(HAVE_BME280) || defined(HAVE_SI7021)
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
@@ -329,17 +328,17 @@ void setup() {
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(wifi_ssid, wifi_password);
-  Serial.print("\n\r\n\rWorking to connect");
+  DPRINT("\n\r\n\rWorking to connect");
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    Serial.print(".");
+    DPRINT(".");
   }
 
-  Serial.println("");
-  Serial.println("Air sensors on esp8266");
-  Serial.print("Connected to ");
-  Serial.println(wifi_ssid);
+  DPRINTLN("");
+  DPRINTLN("Air sensors on esp8266");
+  DPRINT("Connected to ");
+  DPRINTLN(wifi_ssid);
 
   #ifdef HAVE_SSD1306
   display.clearDisplay();
@@ -356,8 +355,8 @@ void setup() {
   server.on("/status/health", action_status_health);
 
   server.begin();
-  Serial.print("Server started at http://");
-  Serial.println(WiFi.localIP());
+  DPRINT("Server started at http://");
+  DPRINTLN(WiFi.localIP());
 
   #ifdef HAVE_SSD1306
   display.print("IP: ");
