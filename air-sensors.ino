@@ -17,11 +17,6 @@
 Adafruit_SSD1306 display(128, 64);
 #endif
 
-#ifdef HAVE_MH_Z19
-#define HAVE_CO2_SENSOR
-#define CO2_MIN 100
-#define CO2_MAX 6000
-
 #if defined(HAVE_MH_Z19) && defined(SWAP_UART0)
   #define DPRINT(...)
   #define DPRINTLN(...)
@@ -29,6 +24,11 @@ Adafruit_SSD1306 display(128, 64);
   #define DPRINT(...)    Serial.print(__VA_ARGS__)
   #define DPRINTLN(...)  Serial.println(__VA_ARGS__)
 #endif
+
+#ifdef HAVE_MH_Z19
+#define HAVE_CO2_SENSOR
+#define CO2_MIN 100
+#define CO2_MAX 6000
 
 int sensorCO2() {
   byte cmd[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
